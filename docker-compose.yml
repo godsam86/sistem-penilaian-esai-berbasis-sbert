@@ -1,4 +1,5 @@
 services:
+
   db:
     image: postgres:15-alpine
     restart: unless-stopped
@@ -9,11 +10,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db_data:/var/lib/postgresql/data
-    # Bagian 30: database tidak dibuka ke jaringan luar. Binding ke 127.0.0.1
-    # saja (bukan 0.0.0.0) supaya HANYA bisa diakses dari mesin ini sendiri --
-    # berguna untuk konek lewat DBeaver/pgAdmin di host, tapi tetap tidak
-    # ter-expose ke jaringan/internet. Di server produksi tanpa kebutuhan
-    # akses langsung, baris "ports" ini boleh dihapus lagi.
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
@@ -32,8 +28,8 @@ services:
     volumes:
       - kb_uploads:/app/media
       - sbert_cache:/root/.cache/huggingface
-    expose:
-      - "8000"
+    ports:
+      - "127.0.0.1:8000:8000"
 
   frontend:
     build: ./frontend
