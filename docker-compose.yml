@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    # Bagian 30: database tidak dibuka ke jaringan luar. Binding ke 127.0.0.1
+    # saja (bukan 0.0.0.0) supaya HANYA bisa diakses dari mesin ini sendiri --
+    # berguna untuk konek lewat DBeaver/pgAdmin di host, tapi tetap tidak
+    # ter-expose ke jaringan/internet. Di server produksi tanpa kebutuhan
+    # akses langsung, baris "ports" ini boleh dihapus lagi.
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - kb_uploads:/app/media
+      - sbert_cache:/root/.cache/huggingface
+    expose:
+      - "8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  db_data:
+  kb_uploads:
+  sbert_cache:

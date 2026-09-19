@@ -1,0 +1,18 @@
+Django==5.0.6
+djangorestframework==3.15.1
+djangorestframework-simplejwt==5.3.1
+psycopg2-binary==2.9.9
+django-cors-headers==4.3.1
+python-decouple==3.8
+gunicorn==22.0.0
+
+# CATATAN: torch SENGAJA tidak dicantumkan di sini. Torch CPU-only dipasang
+# di langkah terpisah pada Dockerfile (lihat komentar di sana) supaya index
+# PyTorch tidak "bocor" ke resolusi package lain di file ini, dan supaya
+# tidak ada ambiguitas yang menarik build CUDA/NVIDIA.
+sentence-transformers==3.0.1
+numpy==1.26.4
+python-docx==1.1.2
+PyPDF2==3.0.1
+openpyxl==3.1.2
+reportlab==4.2.0
