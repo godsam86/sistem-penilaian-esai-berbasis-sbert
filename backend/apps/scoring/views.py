@@ -7,7 +7,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
-
+from apps.knowledge_base.models import KbChunk
 from apps.activity_logs.utils import log_activity
 from apps.answers.models import Jawaban
 from apps.exams.models import Ujian
@@ -114,3 +114,12 @@ class ExportPdfView(APIView):
     def get(self, request):
         from apps.scoring.export import export_pdf
         return export_pdf(filtered_hasil_queryset(request), request)
+    
+class PublicStatsView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        return Response({
+            "total_penilaian": Penilaian.objects.count(),
+            "total_chunk": KbChunk.objects.count(),
+        })
