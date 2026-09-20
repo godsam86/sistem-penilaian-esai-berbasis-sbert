@@ -135,6 +135,11 @@ CORS_ALLOW_CREDENTIALS = True
 
 # --- Scoring parameters (bagian 16 spesifikasi) ---
 SBERT_MODEL = config("SBERT_MODEL", default="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+
+# --- Chunking Knowledge Base (bagian 9) ---
+KB_CHUNK_MAX_WORDS = config("KB_CHUNK_MAX_WORDS", default=150, cast=int)
+KB_CHUNK_OVERLAP_WORDS = config("KB_CHUNK_OVERLAP_WORDS", default=30, cast=int)
+
 SCORING = {
     "SEMANTIC_WEIGHT": config("SEMANTIC_WEIGHT", default=0.80, cast=float),
     "CONCEPT_WEIGHT": config("CONCEPT_WEIGHT", default=0.20, cast=float),

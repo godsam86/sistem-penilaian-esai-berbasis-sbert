@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import GuruLayout from '../../components/guru/GuruLayout';
 import api from '../../utils/api';
 import { SkeletonRows } from '../../components/common/Loading';
-import { Plus, RefreshCw, X, FileText, Type, Upload } from 'lucide-react';
+import ChunkCurationModal from '../../components/guru/ChunkCurationModal';
+import { Plus, RefreshCw, X, FileText, Type, Upload, Layers } from 'lucide-react';
 
 const STATUS_LABEL = {
   pending: 'Menunggu', processing: 'Diproses', done: 'Selesai',
@@ -21,6 +22,7 @@ export default function GuruKB() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ judul: '', sumber: 'text', teks: '', file: null });
+  const [curatingKb, setCuratingKb] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -159,6 +161,9 @@ export default function GuruKB() {
                   {kb.processing_error && <p className="text-xs text-red-500 mt-1">{kb.processing_error}</p>}
                 </td>
                 <td className="px-5 py-3 text-right space-x-2">
+                  <button onClick={() => setCuratingKb(kb)} className="text-primary-600 hover:underline text-xs inline-flex items-center gap-1">
+                    <Layers className="w-3 h-3" /> Lihat Chunk
+                  </button>
                   {kb.processing_status === 'failed' && (
                     <button onClick={() => handleReprocess(kb.id)} className="text-primary-600 hover:underline text-xs inline-flex items-center gap-1">
                       <RefreshCw className="w-3 h-3" /> Coba lagi
@@ -174,6 +179,14 @@ export default function GuruKB() {
           </tbody>
         </table>
       </div>
+
+      {curatingKb && (
+        <ChunkCurationModal
+          kb={curatingKb}
+          onClose={() => setCuratingKb(null)}
+          onChanged={load}
+        />
+      )}
     </GuruLayout>
   );
 }

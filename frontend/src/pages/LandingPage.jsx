@@ -119,7 +119,7 @@ export default function LandingPage() {
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                   </svg>
-                  Login
+                  Login Siswa
                 </button>
                 <button onClick={() => scrollTo('cara-kerja')}
                   className="flex items-center justify-center gap-2 px-7 py-3.5 border border-gray-200 text-gray-700 text-sm font-semibold rounded-2xl hover:bg-gray-50 transition-all">
@@ -421,12 +421,12 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row gap-3 mt-8 justify-center">
             <button onClick={() => navigate('/login')}
               className="px-7 py-3.5 bg-gray-900 text-white text-sm font-bold rounded-2xl hover:bg-gray-700 transition-all shadow-lg">
-              Login
+              Login Siswa
             </button>
-            {/* <button onClick={() => navigate('/login')}
+            <button onClick={() => navigate('/login')}
               className="px-7 py-3.5 border border-violet-300 text-violet-600 text-sm font-bold rounded-2xl hover:bg-violet-50 transition-all">
               Login Guru
-            </button> */}
+            </button>
           </div>
         </div>
       </section>

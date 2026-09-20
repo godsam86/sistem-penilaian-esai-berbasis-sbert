@@ -10,6 +10,20 @@ class KbChunkSerializer(serializers.ModelSerializer):
         # embedding sengaja tidak diekspos ke frontend -- data internal.
 
 
+class KbChunkCurationSerializer(serializers.ModelSerializer):
+    """Untuk kurasi manual: guru boleh mengedit isi sebuah chunk (bagian 9, atas permintaan Anda)."""
+
+    class Meta:
+        model = KbChunk
+        fields = ["id", "chunk_index", "content"]
+        read_only_fields = ["id", "chunk_index"]
+
+    def validate_content(self, value):
+        if not value.strip():
+            raise serializers.ValidationError("Isi chunk tidak boleh kosong.")
+        return value
+
+
 class KnowledgeBaseSerializer(serializers.ModelSerializer):
     jumlah_chunk = serializers.IntegerField(source="chunks.count", read_only=True)
 
