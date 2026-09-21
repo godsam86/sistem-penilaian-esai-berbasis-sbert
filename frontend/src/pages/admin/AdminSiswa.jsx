@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../utils/api';
 import { SkeletonRows } from '../../components/common/Loading';
+import Pagination from '../../components/common/Pagination';
 import { Plus, X, Search } from 'lucide-react';
 
 export default function AdminSiswa() {
@@ -11,6 +12,8 @@ export default function AdminSiswa() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [kelasFilter, setKelasFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -19,14 +22,15 @@ export default function AdminSiswa() {
 
   function emptyForm() { return { nama: '', email: '', nisn: '', kelas: '', jurusan: '' }; }
 
-  const load = async () => {
+  const load = async (targetPage = page) => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page: targetPage };
       if (search) params.search = search;
       if (kelasFilter) params.kelas_id = kelasFilter;
       const { data } = await api.get('/master/siswa/', { params });
       setList(data.results ?? data);
+      if (data.count != null) setTotalPages(Math.max(1, Math.ceil(data.count / 10)));
     } finally {
       setLoading(false);
     }
@@ -37,7 +41,7 @@ export default function AdminSiswa() {
     api.get('/master/jurusan/').then(({ data }) => setJurusanOptions(data.results ?? data));
   }, []);
 
-  useEffect(() => { load(); }, [search, kelasFilter]);
+  useEffect(() => { setPage(1); load(1); }, [search, kelasFilter]);
 
   const openCreate = () => { setForm(emptyForm()); setEditing(null); setShowForm(true); setError(''); };
   const openEdit = (s) => {
@@ -64,6 +68,11 @@ export default function AdminSiswa() {
   const handleDeactivate = async (id) => {
     if (!confirm('Nonaktifkan akun siswa ini?')) return;
     await api.delete(`/master/siswa/${id}/`);
+    load();
+  };
+  const handleActivate = async (id) => {
+    if (!confirm('Aktifkan kembali akun siswa ini?')) return;
+    await api.post(`/master/siswa/${id}/aktifkan/`);
     load();
   };
 
@@ -132,13 +141,18 @@ export default function AdminSiswa() {
                 <td className="px-5 py-3"><span className={`badge ${s.status ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-500'}`}>{s.status ? 'Aktif' : 'Nonaktif'}</span></td>
                 <td className="px-5 py-3 text-right space-x-2">
                   <button onClick={() => openEdit(s)} className="text-primary-600 hover:underline text-xs">Ubah</button>
-                  <button onClick={() => handleDeactivate(s.id)} className="text-red-500 hover:underline text-xs">Nonaktifkan</button>
+                  {s.status ? (
+                    <button onClick={() => handleDeactivate(s.id)} className="text-red-500 hover:underline text-xs">Nonaktifkan</button>
+                  ) : (
+                    <button onClick={() => handleActivate(s.id)} className="text-green-600 hover:underline text-xs">Aktifkan</button>
+                  )}
                 </td>
               </tr>
             ))}
             {!loading && list.length === 0 && <tr><td colSpan={6} className="px-5 py-8 text-center text-surface-400">Belum ada akun siswa.</td></tr>}
           </tbody>
         </table>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
     </AdminLayout>
   );

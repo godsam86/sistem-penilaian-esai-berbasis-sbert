@@ -25,7 +25,6 @@ class GuruAccountSerializer(serializers.ModelSerializer):
     `master_guru` sekaligus, dalam satu transaksi (bagian 25).
     """
 
-    id = serializers.IntegerField(source="user.id", read_only=True)
     nama = serializers.CharField(source="user.nama")
     email = serializers.EmailField(source="user.email")
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -34,6 +33,7 @@ class GuruAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = MasterGuru
         fields = ["id", "nama", "email", "password", "nip", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
     @transaction.atomic
     def create(self, validated_data):
@@ -66,7 +66,6 @@ class GuruAccountSerializer(serializers.ModelSerializer):
 class AdminAccountSerializer(serializers.ModelSerializer):
     """Admin membuat/mengubah akun admin lain: `users` (role=admin) + `master_admin`, satu transaksi."""
 
-    id = serializers.IntegerField(source="user.id", read_only=True)
     nama = serializers.CharField(source="user.nama")
     email = serializers.EmailField(source="user.email")
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -75,6 +74,7 @@ class AdminAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = MasterAdmin
         fields = ["id", "nama", "email", "password", "jabatan", "status", "created_at", "updated_at"]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
     @transaction.atomic
     def create(self, validated_data):
@@ -108,7 +108,6 @@ class AdminAccountSerializer(serializers.ModelSerializer):
 class SiswaAccountSerializer(serializers.ModelSerializer):
     """Admin membuat/mengubah akun siswa: `users` (role=siswa, tanpa password) + `master_siswa`."""
 
-    id = serializers.IntegerField(source="user.id", read_only=True)
     nama = serializers.CharField(source="user.nama")
     email = serializers.EmailField(source="user.email")
     status = serializers.IntegerField(source="user.status", required=False)
@@ -119,6 +118,7 @@ class SiswaAccountSerializer(serializers.ModelSerializer):
             "id", "nama", "email", "nisn", "kelas", "jurusan", "status",
             "created_at", "updated_at",
         ]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
     @transaction.atomic
     def create(self, validated_data):

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../utils/api';
 import { SkeletonRows } from '../../components/common/Loading';
+import Pagination from '../../components/common/Pagination';
 import { Plus, X, Search } from 'lucide-react';
 
 export default function AdminGuru() {
@@ -13,18 +14,23 @@ export default function AdminGuru() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ nama: '', email: '', password: '', nip: '' });
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const load = async () => {
+  const load = async (targetPage = page) => {
     setLoading(true);
     try {
-      const { data } = await api.get('/master/guru/', { params: search ? { search } : {} });
+      const params = { page: targetPage };
+      if (search) params.search = search;
+      const { data } = await api.get('/master/guru/', { params });
       setList(data.results ?? data);
+      if (data.count != null) setTotalPages(Math.max(1, Math.ceil(data.count / 10)));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => { setPage(1); load(1); }, [search]);
 
   const openCreate = () => { setForm({ nama: '', email: '', password: '', nip: '' }); setEditing(null); setShowForm(true); setError(''); };
   const openEdit = (g) => { setForm({ nama: g.nama, email: g.email, password: '', nip: g.nip || '' }); setEditing(g.id); setShowForm(true); setError(''); };
@@ -48,6 +54,11 @@ export default function AdminGuru() {
   const handleDeactivate = async (id) => {
     if (!confirm('Nonaktifkan akun guru ini?')) return;
     await api.delete(`/master/guru/${id}/`);
+    load();
+  };
+  const handleActivate = async (id) => {
+    if (!confirm('Aktifkan kembali akun guru ini?')) return;
+    await api.post(`/master/guru/${id}/aktifkan/`);
     load();
   };
 
@@ -97,13 +108,18 @@ export default function AdminGuru() {
                 <td className="px-5 py-3"><span className={`badge ${g.status ? 'bg-green-100 text-green-700' : 'bg-surface-100 text-surface-500'}`}>{g.status ? 'Aktif' : 'Nonaktif'}</span></td>
                 <td className="px-5 py-3 text-right space-x-2">
                   <button onClick={() => openEdit(g)} className="text-primary-600 hover:underline text-xs">Ubah</button>
-                  <button onClick={() => handleDeactivate(g.id)} className="text-red-500 hover:underline text-xs">Nonaktifkan</button>
+                  {g.status ? (
+                    <button onClick={() => handleDeactivate(g.id)} className="text-red-500 hover:underline text-xs">Nonaktifkan</button>
+                  ) : (
+                    <button onClick={() => handleActivate(g.id)} className="text-green-600 hover:underline text-xs">Aktifkan</button>
+                  )}
                 </td>
               </tr>
             ))}
             {!loading && list.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-surface-400">Belum ada akun guru.</td></tr>}
           </tbody>
         </table>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
     </AdminLayout>
   );

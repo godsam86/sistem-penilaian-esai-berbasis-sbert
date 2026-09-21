@@ -1,4 +1,5 @@
 from rest_framework import viewsets
+from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 
@@ -31,7 +32,8 @@ class ReadableByAnyAuthenticatedMixin:
 class SoftDeactivateMixin:
     """
     Bagian 25: admin tidak menghapus, hanya menonaktifkan (status=0).
-    Riwayat transaksi terkait tetap aman (bagian 28).
+    Riwayat transaksi terkait tetap aman (bagian 28). Bisa diaktifkan
+    kembali lewat action `aktifkan` (atas permintaan Anda).
     """
 
     def destroy(self, request, *args, **kwargs):
@@ -47,6 +49,22 @@ class SoftDeactivateMixin:
             request=request,
         )
         return Response(status=204)
+
+    @action(detail=True, methods=["post"])
+    def aktifkan(self, request, pk=None):
+        instance = self.get_object()
+        target = getattr(instance, "user", instance)
+        target.status = 1
+        target.save(update_fields=["status"])
+        log_activity(
+            request.user,
+            action="aktifkan",
+            module=self.activity_module,
+            description=f"id={instance.pk}",
+            request=request,
+        )
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
 
 class MasterKelasViewSet(ReadableByAnyAuthenticatedMixin, viewsets.ModelViewSet):

@@ -3,6 +3,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../utils/api';
 import { useAuth } from '../../hooks/useAuth';
 import { SkeletonRows } from '../../components/common/Loading';
+import Pagination from '../../components/common/Pagination';
 import { Plus, X, Search, ShieldAlert } from 'lucide-react';
 
 export default function AdminAkun() {
@@ -15,18 +16,23 @@ export default function AdminAkun() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({ nama: '', email: '', password: '', jabatan: '' });
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const load = async () => {
+  const load = async (targetPage = page) => {
     setLoading(true);
     try {
-      const { data } = await api.get('/master/admin/', { params: search ? { search } : {} });
+      const params = { page: targetPage };
+      if (search) params.search = search;
+      const { data } = await api.get('/master/admin/', { params });
       setList(data.results ?? data);
+      if (data.count != null) setTotalPages(Math.max(1, Math.ceil(data.count / 10)));
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => { setPage(1); load(1); }, [search]);
 
   const openCreate = () => { setForm({ nama: '', email: '', password: '', jabatan: '' }); setEditing(null); setShowForm(true); setError(''); };
   const openEdit = (a) => { setForm({ nama: a.nama, email: a.email, password: '', jabatan: a.jabatan || '' }); setEditing(a.id); setShowForm(true); setError(''); };
@@ -54,6 +60,16 @@ export default function AdminAkun() {
       load();
     } catch (err) {
       alert(err.response?.data?.detail || 'Gagal menonaktifkan.');
+    }
+  };
+
+  const handleActivate = async (a) => {
+    if (!confirm(`Aktifkan kembali akun admin ${a.nama}?`)) return;
+    try {
+      await api.post(`/master/admin/${a.id}/aktifkan/`);
+      load();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Gagal mengaktifkan.');
     }
   };
 
@@ -110,8 +126,10 @@ export default function AdminAkun() {
                     <span className="text-surface-300 text-xs inline-flex items-center gap-1" title="Tidak bisa menonaktifkan akun sendiri">
                       <ShieldAlert className="w-3 h-3" /> Nonaktifkan
                     </span>
-                  ) : (
+                  ) : a.status ? (
                     <button onClick={() => handleDeactivate(a)} className="text-red-500 hover:underline text-xs">Nonaktifkan</button>
+                  ) : (
+                    <button onClick={() => handleActivate(a)} className="text-green-600 hover:underline text-xs">Aktifkan</button>
                   )}
                 </td>
               </tr>
@@ -119,6 +137,7 @@ export default function AdminAkun() {
             {!loading && list.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-surface-400">Belum ada akun admin lain.</td></tr>}
           </tbody>
         </table>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
     </AdminLayout>
   );
