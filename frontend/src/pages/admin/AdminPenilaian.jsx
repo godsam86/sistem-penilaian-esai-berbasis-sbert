@@ -28,11 +28,32 @@ export default function AdminPenilaian() {
 
   useEffect(() => { load(1); setPage(1); }, [search]);
 
-  const handleExport = (format) => {
-    const params = new URLSearchParams();
-    if (search) params.set('search', search);
-    window.open(`/api/penilaian/export/${format}/?${params.toString()}`, '_blank');
-  };
+  const handleExport = async (format) => {
+  const params = {};
+  if (search) params.search = search;
+  if (ujianFilter) params.ujian_id = ujianFilter;
+
+  try {
+    const response = await api.get(`/penilaian/export/${format}/`, {
+      params,
+      responseType: 'blob',
+    });
+
+    const blob = new Blob([response.data]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `hasil_penilaian.${format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Export gagal:', error);
+    alert('Gagal mengexport data.');
+  }
+};
 
   return (
     <AdminLayout title="Seluruh Hasil Penilaian">
