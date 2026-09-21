@@ -74,6 +74,9 @@ class MasterKelasViewSet(ReadableByAnyAuthenticatedMixin, viewsets.ModelViewSet)
     filter_backends = [SearchFilter]
     search_fields = ["nama_kelas", "tingkat"]
     activity_module = "master_kelas"
+    # Data referensi untuk dropdown (bagian 5) -- selalu lengkap, tidak
+    # dipaginasi seperti daftar akun yang bisa sangat banyak.
+    pagination_class = None
 
     def perform_create(self, serializer):
         instance = serializer.save(created_by=self.request.user.id)
@@ -91,6 +94,7 @@ class MasterJurusanViewSet(ReadableByAnyAuthenticatedMixin, viewsets.ModelViewSe
     filter_backends = [SearchFilter]
     search_fields = ["nama_jurusan", "kode_jurusan"]
     activity_module = "master_jurusan"
+    pagination_class = None
 
     def perform_create(self, serializer):
         instance = serializer.save(created_by=self.request.user.id)

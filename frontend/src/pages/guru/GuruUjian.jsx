@@ -22,7 +22,7 @@ export default function GuruUjian() {
   const load = async () => {
     setLoading(true);
     try {
-      const [ujianRes, soalRes] = await Promise.all([api.get('/ujian/'), api.get('/soal/')]);
+      const [ujianRes, soalRes] = await Promise.all([api.get('/ujian/'), api.get('/soal/', { params: { page_size: 1000 } })]);
       setList(ujianRes.data.results ?? ujianRes.data);
       setSoalOptions((soalRes.data.results ?? soalRes.data).filter(s => s.siap_dipakai));
     } finally {

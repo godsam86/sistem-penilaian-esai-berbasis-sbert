@@ -111,6 +111,10 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 10,
+    # Endpoint tertentu (misal dashboard yang butuh hitung dari SELURUH data,
+    # bukan cuma satu halaman) bisa minta ?page_size=1000 secara eksplisit.
+    # Default tetap 10 kalau parameter ini tidak dikirim.
+    "PAGE_SIZE_QUERY_PARAM": "page_size",
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",
     ),

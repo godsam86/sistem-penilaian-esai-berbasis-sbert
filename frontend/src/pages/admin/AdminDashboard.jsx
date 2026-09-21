@@ -12,10 +12,14 @@ export default function AdminDashboard() {
     Promise.all([
       api.get('/master/guru/'), api.get('/master/siswa/'), api.get('/master/kelas/'),
     ]).then(([guru, siswa, kelas]) => {
+      // Bagian penting: pakai `count` dari response pagination (total
+      // sebenarnya), BUKAN `.length` -- karena `.length` cuma menghitung
+      // isi satu halaman (maks PAGE_SIZE, sekarang 10), bukan total data.
+      const totalOf = (res) => res.data.count ?? (Array.isArray(res.data) ? res.data.length : (res.data.results ?? []).length);
       setStats({
-        guru: (guru.data.results ?? guru.data).length,
-        siswa: (siswa.data.results ?? siswa.data).length,
-        kelas: (kelas.data.results ?? kelas.data).length,
+        guru: totalOf(guru),
+        siswa: totalOf(siswa),
+        kelas: totalOf(kelas),
       });
     });
   }, []);

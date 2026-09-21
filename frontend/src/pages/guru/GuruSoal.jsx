@@ -23,7 +23,7 @@ export default function GuruSoal() {
     try {
       const [soalRes, kbRes] = await Promise.all([
         api.get('/soal/'),
-        api.get('/knowledge-base/'),
+        api.get('/knowledge-base/', { params: { page_size: 1000 } }),
       ]);
       setList(soalRes.data.results ?? soalRes.data);
       setKbList((kbRes.data.results ?? kbRes.data).filter(kb => kb.processing_status === 'done'));

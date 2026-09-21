@@ -9,20 +9,25 @@ export default function GuruDashboard() {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    Promise.all([api.get('/knowledge-base/'), api.get('/soal/'), api.get('/ujian/')]).then(
-      ([kb, soal, ujian]) => {
-        const kbList = kb.data.results ?? kb.data;
-        const soalList = soal.data.results ?? soal.data;
-        const ujianList = ujian.data.results ?? ujian.data;
-        setStats({
-          kb: kbList.length,
-          soal: soalList.length,
-          soalSiap: soalList.filter(s => s.siap_dipakai).length,
-          ujian: ujianList.length,
-          ujianAktif: ujianList.filter(u => u.status === 'aktif').length,
-        });
-      }
-    );
+    // page_size=1000: dashboard butuh hitung dari SELURUH data guru ini
+    // (termasuk untuk sub-angka "siap dipakai"/"aktif"), bukan cuma 10
+    // baris pertama yang dikembalikan pagination default.
+    Promise.all([
+      api.get('/knowledge-base/', { params: { page_size: 1000 } }),
+      api.get('/soal/', { params: { page_size: 1000 } }),
+      api.get('/ujian/', { params: { page_size: 1000 } }),
+    ]).then(([kb, soal, ujian]) => {
+      const kbList = kb.data.results ?? kb.data;
+      const soalList = soal.data.results ?? soal.data;
+      const ujianList = ujian.data.results ?? ujian.data;
+      setStats({
+        kb: kb.data.count ?? kbList.length,
+        soal: soal.data.count ?? soalList.length,
+        soalSiap: soalList.filter(s => s.siap_dipakai).length,
+        ujian: ujian.data.count ?? ujianList.length,
+        ujianAktif: ujianList.filter(u => u.status === 'aktif').length,
+      });
+    });
   }, []);
 
   const cards = [
