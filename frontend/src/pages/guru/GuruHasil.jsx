@@ -67,6 +67,7 @@ export default function GuruHasil() {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-50 text-left text-xs font-semibold uppercase text-surface-500">
             <tr>
@@ -105,6 +106,7 @@ export default function GuruHasil() {
             )}
           </tbody>
         </table>
+        </div>
         <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
 

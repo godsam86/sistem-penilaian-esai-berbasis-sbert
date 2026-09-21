@@ -20,8 +20,39 @@ class ConceptUnitResult:
 
 
 def _split_kalimat(text: str) -> list[str]:
-    kalimat = [k.strip() for k in re.split(r"(?<=[.!?])\s+|\n+", text) if k.strip()]
-    return kalimat or ([text.strip()] if text.strip() else [])
+    """
+    Kandidat pembanding untuk tiap Concept Unit: kalimat penuh (dipisah
+    tanda baca akhir) DITAMBAH klausa yang dipisah koma di dalamnya.
+
+    Ditambahkan karena jawaban esai sering menggabungkan beberapa definisi
+    konsep dalam satu kalimat majemuk, contoh pola nyata:
+    "Tesis berisi ..., argumentasi berisi ..., sedangkan penegasan ulang
+    berisi ...". Kalau hanya dipisah per kalimat, gabungan itu jadi SATU
+    vektor "encer" berisi campuran 3 konsep -- similarity-nya ke SETIAP
+    Concept Unit di dalamnya jadi turun, walau isinya sudah benar.
+
+    Menambah klausa per-koma sebagai kandidat TAMBAHAN (bukan pengganti)
+    hanya bisa menaikkan atau menyamakan similarity maksimum tiap CU --
+    tidak pernah menurunkannya, karena kalimat penuh tetap ikut dibandingkan.
+    """
+    kalimat_penuh = [k.strip() for k in re.split(r"(?<=[.!?])\s+|\n+", text) if k.strip()]
+
+    klausa = []
+    for k in kalimat_penuh:
+        for bagian in k.split(","):
+            bagian = bagian.strip().rstrip(".!?")
+            if len(bagian.split()) >= 3:  # lewati pecahan terlalu pendek untuk jadi bermakna
+                klausa.append(bagian)
+
+    kandidat = kalimat_penuh + klausa
+    dilihat = set()
+    unik = []
+    for k in kandidat:
+        if k not in dilihat:
+            dilihat.add(k)
+            unik.append(k)
+
+    return unik or ([text.strip()] if text.strip() else [])
 
 
 def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:

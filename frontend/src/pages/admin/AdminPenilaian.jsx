@@ -46,6 +46,7 @@ export default function AdminPenilaian() {
       </div>
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-50 text-left text-xs font-semibold uppercase text-surface-500">
             <tr><th className="px-5 py-3">Siswa</th><th className="px-5 py-3">Kelas/Jurusan</th><th className="px-5 py-3">Ujian</th><th className="px-5 py-3">Skor</th><th className="px-5 py-3">Status</th></tr>
@@ -67,6 +68,7 @@ export default function AdminPenilaian() {
             {!loading && list.length === 0 && <tr><td colSpan={5} className="px-5 py-8 text-center text-surface-400">Belum ada hasil.</td></tr>}
           </tbody>
         </table>
+        </div>
         <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
     </AdminLayout>

@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+import numpy as np
 from django.test import TestCase
 
 from apps.answers.models import Jawaban
@@ -182,3 +183,61 @@ class ScoringPipelineTests(TestCase):
         Jawaban.objects.create(ujian=self.ujian, siswa=self.siswa, soal=self.soal, jawaban_teks="jawaban pertama")
         with self.assertRaises(IntegrityError):
             Jawaban.objects.create(ujian=self.ujian, siswa=self.siswa, soal=self.soal, jawaban_teks="jawaban kedua")
+
+
+class ConceptSplittingRegressionTests(TestCase):
+    """
+    Regresi kasus nyata yang Anda laporkan: jawaban esai yang mendefinisikan
+    beberapa Concept Unit dalam SATU kalimat majemuk (dipisah koma +
+    "sedangkan") harus tetap bisa terdeteksi per-konsep, bukan cuma 2 dari 5.
+    """
+
+    def setUp(self):
+        self.cu_tesis = type("CU", (), {"id": 3, "konsep": "Tesis - bagian yang berisi pengenalan topik atau pendapat awal penulis"})()
+        self.cu_argumentasi = type("CU", (), {"id": 4, "konsep": "Argumentasi - bagian yang berisi alasan, penjelasan, fakta, atau data yang mendukung tesis"})()
+        self.cu_penegasan = type("CU", (), {"id": 5, "konsep": "Penegasan ulang - bagian yang menegaskan kembali pendapat atau gagasan utama yang telah disampaikan"})()
+
+        self.jawaban = (
+            "Struktur teks eksposisi terdiri atas tesis, argumentasi, dan penegasan ulang. "
+            "Tesis berisi pengenalan topik atau pendapat awal penulis, argumentasi berisi alasan, "
+            "penjelasan, fakta, atau data yang mendukung tesis, sedangkan penegasan ulang berisi "
+            "penegasan kembali pendapat atau gagasan utama yang telah disampaikan."
+        )
+
+    @patch("apps.knowledge_base.services.embedding.embed_texts", side_effect=_fake_embed_texts)
+    def test_klausa_tesis_kini_jadi_kandidat_tersendiri(self, mock_embed):
+        from apps.scoring.services.concept_scoring import _split_kalimat
+
+        kandidat = _split_kalimat(self.jawaban)
+        # Klausa bersih "Tesis berisi ..." harus muncul sebagai kandidat
+        # tersendiri (sebelum perbaikan, ini hanya ada sebagai bagian dari
+        # satu kalimat majemuk yang mengandung 3 definisi konsep sekaligus).
+        self.assertTrue(
+            any(k.startswith("Tesis berisi pengenalan topik") for k in kandidat),
+            f"Klausa Tesis tidak ditemukan sebagai kandidat terpisah: {kandidat}",
+        )
+        self.assertTrue(
+            any(k.startswith("sedangkan penegasan ulang berisi") for k in kandidat),
+            f"Klausa penegasan ulang tidak ditemukan sebagai kandidat terpisah: {kandidat}",
+        )
+
+    @patch("apps.knowledge_base.services.embedding.embed_texts", side_effect=_fake_embed_texts)
+    def test_similarity_tesis_naik_dibanding_hanya_kalimat_utuh(self, mock_embed):
+        """
+        Bandingkan similarity CU Tesis: pakai klausa vs pakai kalimat utuh
+        yang tercampur 3 konsep. Similarity dgn klausa harus >= similarity
+        dgn kalimat penuh -- inti dari perbaikan ini (tidak pernah menurun).
+        """
+        from apps.scoring.services.concept_scoring import _cosine_sim
+
+        klausa_bersih = "Tesis berisi pengenalan topik atau pendapat awal penulis"
+        kalimat_campur = (
+            "Tesis berisi pengenalan topik atau pendapat awal penulis, argumentasi berisi alasan, "
+            "penjelasan, fakta, atau data yang mendukung tesis, sedangkan penegasan ulang berisi "
+            "penegasan kembali pendapat atau gagasan utama yang telah disampaikan."
+        )
+        cu_vec = np.array(_fake_embed_texts([self.cu_tesis.konsep])[0])
+        sim_klausa = _cosine_sim(cu_vec, np.array(_fake_embed_texts([klausa_bersih])[0]))
+        sim_campur = _cosine_sim(cu_vec, np.array(_fake_embed_texts([kalimat_campur])[0]))
+
+        self.assertGreaterEqual(sim_klausa, sim_campur)

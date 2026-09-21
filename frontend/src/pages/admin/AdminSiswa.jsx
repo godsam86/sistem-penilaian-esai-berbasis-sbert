@@ -127,6 +127,7 @@ export default function AdminSiswa() {
       )}
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-50 text-left text-xs font-semibold uppercase text-surface-500">
             <tr><th className="px-5 py-3">Nama</th><th className="px-5 py-3">NISN</th><th className="px-5 py-3">Kelas</th><th className="px-5 py-3">Jurusan</th><th className="px-5 py-3">Status</th><th className="px-5 py-3 text-right">Aksi</th></tr>
@@ -152,6 +153,7 @@ export default function AdminSiswa() {
             {!loading && list.length === 0 && <tr><td colSpan={6} className="px-5 py-8 text-center text-surface-400">Belum ada akun siswa.</td></tr>}
           </tbody>
         </table>
+        </div>
         <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
     </AdminLayout>

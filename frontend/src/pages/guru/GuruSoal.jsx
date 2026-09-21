@@ -160,6 +160,7 @@ export default function GuruSoal() {
       )}
 
       <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-surface-50 text-left text-xs font-semibold uppercase text-surface-500">
             <tr>
@@ -192,6 +193,7 @@ export default function GuruSoal() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </GuruLayout>
   );
