@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import GuruLayout from '../../components/guru/GuruLayout';
 import api from '../../utils/api';
 import { SkeletonRows } from '../../components/common/Loading';
+import Pagination from '../../components/common/Pagination';
 import ChunkCurationModal from '../../components/guru/ChunkCurationModal';
 import { Plus, RefreshCw, X, FileText, Type, Upload, Layers } from 'lucide-react';
 
@@ -23,12 +24,15 @@ export default function GuruKB() {
   const [error, setError] = useState('');
   const [form, setForm] = useState({ judul: '', sumber: 'text', teks: '', file: null });
   const [curatingKb, setCuratingKb] = useState(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
 
-  const load = async () => {
+  const load = async (targetPage = page) => {
     setLoading(true);
     try {
-      const { data } = await api.get('/knowledge-base/');
+      const { data } = await api.get('/knowledge-base/', { params: { page: targetPage } });
       setList(data.results ?? data);
+      if (data.count != null) setTotalPages(Math.max(1, Math.ceil(data.count / 10)));
     } finally {
       setLoading(false);
     }
@@ -180,6 +184,7 @@ export default function GuruKB() {
           </tbody>
         </table>
         </div>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => { setPage(p); load(p); }} />
       </div>
 
       {curatingKb && (
