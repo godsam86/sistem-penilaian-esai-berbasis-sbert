@@ -241,3 +241,183 @@ class ConceptSplittingRegressionTests(TestCase):
         sim_campur = _cosine_sim(cu_vec, np.array(_fake_embed_texts([kalimat_campur])[0]))
 
         self.assertGreaterEqual(sim_klausa, sim_campur)
+
+
+class TopKChunksPersistenceTests(TestCase):
+    """Chunk relevan (top-K) harus tersimpan di Penilaian, atas permintaan Anda, untuk ditampilkan di detail hasil."""
+
+    def setUp(self):
+        kelas = MasterKelas.objects.create(nama_kelas="X TKJ 3", tingkat="X")
+        jurusan = MasterJurusan.objects.create(kode_jurusan="TKJ3", nama_jurusan="TKJ 3")
+        guru_user = User.objects.create_user(email="topk-guru@sekolah.id", password="x", nama="Guru", role=Role.GURU)
+        guru = MasterGuru.objects.create(user=guru_user)
+        siswa_user = User.objects.create_user(email="topk-siswa@sekolah.id", password=None, nama="Siswa", role=Role.SISWA)
+        siswa = MasterSiswa.objects.create(user=siswa_user, nisn="0011", kelas=kelas, jurusan=jurusan)
+
+        kb = KnowledgeBase.objects.create(
+            judul="Materi Top-K", sumber="text", teks="materi relevan",
+            guru=guru, processing_status=ProcessingStatus.DONE,
+        )
+        with patch("apps.knowledge_base.services.embedding.embed_texts", side_effect=_fake_embed_texts):
+            from apps.knowledge_base.services.chunking import split_into_chunks
+            from apps.knowledge_base.services.embedding import embed_texts
+            chunk_texts = split_into_chunks(kb.teks)
+            embeddings = embed_texts(chunk_texts)
+            for i, (content, emb) in enumerate(zip(chunk_texts, embeddings)):
+                KbChunk.objects.create(knowledge_base=kb, chunk_index=i, content=content, embedding=emb)
+
+        soal = Soal.objects.create(guru=guru, pertanyaan="Jelaskan materi relevan.")
+        SoalKnowledgeBase.objects.create(soal=soal, knowledge_base=kb)
+        ConceptUnit.objects.create(soal=soal, konsep="materi relevan", urutan=1)
+
+        ujian = Ujian.objects.create(nama_ujian="UH", jenis_ujian="Ulangan Harian", guru=guru, kelas=kelas, jurusan=jurusan, token="TOPKX")
+        UjianSoal.objects.create(ujian=ujian, soal=soal, urutan=1)
+        self.jawaban = Jawaban.objects.create(ujian=ujian, siswa=siswa, soal=soal, jawaban_teks="materi relevan sekali")
+
+    @patch("apps.knowledge_base.services.embedding.embed_texts", side_effect=_fake_embed_texts)
+    def test_top_k_chunks_tersimpan_dengan_isi_dan_similarity(self, mock_embed):
+        penilaian = score_jawaban(self.jawaban)
+        self.assertTrue(len(penilaian.top_k_chunks) > 0)
+        chunk_info = penilaian.top_k_chunks[0]
+        self.assertIn("chunk_id", chunk_info)
+        self.assertIn("similarity", chunk_info)
+        self.assertIn("content", chunk_info)
+        self.assertIn("knowledge_base_judul", chunk_info)
+        self.assertEqual(chunk_info["knowledge_base_judul"], "Materi Top-K")
+
+    @patch("apps.knowledge_base.services.embedding.embed_texts", side_effect=_fake_embed_texts)
+    def test_top_k_chunks_kosong_untuk_jawaban_kosong(self, mock_embed):
+        self.jawaban.jawaban_teks = ""
+        self.jawaban.save()
+        penilaian = score_jawaban(self.jawaban)
+        self.assertEqual(penilaian.top_k_chunks, [])
+
+
+class ExportLaporanTests(TestCase):
+    """Ekspor = laporan profesional: info ujian dari DB + rekap nilai akhir per siswa (bagian 21 & 29)."""
+
+    def setUp(self):
+        from rest_framework.test import APIClient
+
+        from apps.scoring.models import Penilaian
+
+        kelas = MasterKelas.objects.create(nama_kelas="XI RPL 2", tingkat="XI")
+        jurusan = MasterJurusan.objects.create(kode_jurusan="RPL", nama_jurusan="Rekayasa Perangkat Lunak")
+        guru_user = User.objects.create_user(email="lap-guru@sekolah.id", password="Rahasia1", nama="Ibu Sari Wulandari", role=Role.GURU)
+        guru = MasterGuru.objects.create(user=guru_user)
+
+        soal1 = Soal.objects.create(guru=guru, pertanyaan="Jelaskan teks eksposisi.")
+        soal2 = Soal.objects.create(guru=guru, pertanyaan="Jelaskan teks narasi.")
+        ujian = Ujian.objects.create(
+            nama_ujian="UTS Bahasa Indonesia", jenis_ujian="UTS", guru=guru,
+            kelas=kelas, jurusan=jurusan, token="LAPOR",
+        )
+        UjianSoal.objects.create(ujian=ujian, soal=soal1, urutan=1)
+        UjianSoal.objects.create(ujian=ujian, soal=soal2, urutan=2)
+
+        def buat_siswa(nama, nisn):
+            u = User.objects.create_user(email=f"{nisn}@sekolah.id", password=None, nama=nama, role=Role.SISWA)
+            return MasterSiswa.objects.create(user=u, nisn=nisn, kelas=kelas, jurusan=jurusan)
+
+        def nilai(siswa, soal, skor, status="success"):
+            j = Jawaban.objects.create(ujian=ujian, siswa=siswa, soal=soal, jawaban_teks="jawaban")
+            Penilaian.objects.create(jawaban=j, final_score=skor, processing_status=status)
+
+        andi = buat_siswa("Andi Pratama", "9001")   # 80 & 60 -> 70.00
+        budi = buat_siswa("Budi Hartono", "9002")   # hanya 1 soal (90) -> 90/2 = 45.00
+        nilai(andi, soal1, 80.0)
+        nilai(andi, soal2, 60.0)
+        nilai(budi, soal1, 90.0)
+
+        self.client = APIClient()
+        token = self.client.post("/api/auth/login/", {"email": "lap-guru@sekolah.id", "credential": "Rahasia1"}, format="json").json()["access"]
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
+
+    def _sel_xlsx(self):
+        from io import BytesIO
+
+        from openpyxl import load_workbook
+
+        res = self.client.get("/api/penilaian/export/xlsx/")
+        self.assertEqual(res.status_code, 200)
+        wb = load_workbook(BytesIO(res.content))
+        ws = wb["Rekap Nilai"]
+        return wb, [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+
+    def test_excel_memuat_blok_info_dari_database(self):
+        _, sel = self._sel_xlsx()
+        teks = " | ".join(sel)
+        self.assertIn("UTS Bahasa Indonesia", teks)
+        self.assertIn("XI RPL 2", teks)
+        self.assertIn("Rekayasa Perangkat Lunak", teks)
+        self.assertIn("Ibu Sari Wulandari", teks)
+        self.assertIn("Tanggal Pelaksanaan", teks)
+
+    def test_excel_nilai_akhir_rata_rata_seluruh_soal_belum_dijawab_nol(self):
+        wb, _ = self._sel_xlsx()
+        ws = wb["Rekap Nilai"]
+        nilai_per_nama = {}
+        for row in ws.iter_rows(values_only=True):
+            if row and row[1] in ("Andi Pratama", "Budi Hartono"):
+                nilai_per_nama[row[1]] = row[6]
+        self.assertEqual(nilai_per_nama["Andi Pratama"], 70.0)
+        self.assertEqual(nilai_per_nama["Budi Hartono"], 45.0)
+
+    def test_excel_keterangan_soal_belum_dijawab(self):
+        _, sel = self._sel_xlsx()
+        self.assertIn("1 soal belum dijawab", " | ".join(sel))
+
+    def test_excel_punya_sheet_rincian_per_soal(self):
+        wb, _ = self._sel_xlsx()
+        self.assertIn("Rincian Per Soal", wb.sheetnames)
+        ws = wb["Rincian Per Soal"]
+        semua = " | ".join(str(c.value) for row in ws.iter_rows() for c in row if c.value is not None)
+        self.assertIn("Jelaskan teks eksposisi.", semua)
+
+    def test_soal_gagal_diproses_tidak_dipaksa_jadi_nol(self):
+        from apps.scoring.models import Penilaian
+
+        p = Penilaian.objects.filter(jawaban__siswa__nisn="9001").first()
+        p.final_score = None
+        p.processing_status = "failed"
+        p.save()
+        wb, sel = self._sel_xlsx()
+        ws = wb["Rekap Nilai"]
+        andi = [row for row in ws.iter_rows(values_only=True) if row and row[1] == "Andi Pratama"][0]
+        self.assertEqual(andi[6], "-")
+        self.assertIn("Ada soal gagal diproses", " | ".join(sel))
+
+    def test_pdf_valid_dan_memuat_info_ujian(self):
+        from io import BytesIO
+
+        from PyPDF2 import PdfReader
+
+        res = self.client.get("/api/penilaian/export/pdf/")
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.content.startswith(b"%PDF"))
+        teks = " ".join(page.extract_text() or "" for page in PdfReader(BytesIO(res.content)).pages)
+        self.assertIn("UTS Bahasa Indonesia", teks)
+        self.assertIn("Ibu Sari Wulandari", teks)
+        self.assertIn("Andi Pratama", teks)
+        self.assertIn("70.00", teks)
+
+    def test_nama_dengan_karakter_khusus_tidak_merusak_pdf(self):
+        u = User.objects.create_user(email="khusus@sekolah.id", password=None, nama="Siti <b>& Co", role=Role.SISWA)
+        MasterSiswa.objects.create(
+            user=u, nisn="9003",
+            kelas=MasterKelas.objects.get(nama_kelas="XI RPL 2"),
+            jurusan=MasterJurusan.objects.get(kode_jurusan="RPL"),
+        )
+        from apps.scoring.models import Penilaian
+
+        ujian = Ujian.objects.get(token="LAPOR")
+        j = Jawaban.objects.create(ujian=ujian, siswa=MasterSiswa.objects.get(nisn="9003"), soal=Soal.objects.first(), jawaban_teks="x")
+        Penilaian.objects.create(jawaban=j, final_score=50.0, processing_status="success")
+        res = self.client.get("/api/penilaian/export/pdf/")
+        self.assertEqual(res.status_code, 200)
+
+    def test_export_kosong_tidak_error(self):
+        res_x = self.client.get("/api/penilaian/export/xlsx/?search=tidakadanamaini")
+        res_p = self.client.get("/api/penilaian/export/pdf/?search=tidakadanamaini")
+        self.assertEqual(res_x.status_code, 200)
+        self.assertEqual(res_p.status_code, 200)

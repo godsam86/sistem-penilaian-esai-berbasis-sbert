@@ -40,6 +40,7 @@ def score_jawaban(jawaban: Jawaban) -> Penilaian:
             penilaian.scoring_version = SCORING_VERSION
             penilaian.processing_status = ProcessingStatus.SUCCESS
             penilaian.processing_error = ""
+            penilaian.top_k_chunks = []
             penilaian.save()
             return penilaian
 
@@ -85,6 +86,7 @@ def score_jawaban(jawaban: Jawaban) -> Penilaian:
             penilaian.scoring_version = SCORING_VERSION
             penilaian.processing_status = ProcessingStatus.SUCCESS
             penilaian.processing_error = ""
+            penilaian.top_k_chunks = semantic_result.top_k_chunks
             penilaian.feedback = build_feedback(
                 jawaban_kosong=False,
                 relevance_status=relevance_status,
@@ -123,4 +125,4 @@ def _chunks_for_soal(soal):
     from apps.knowledge_base.models import KbChunk
 
     kb_ids = list(soal.knowledge_bases.values_list("id", flat=True))
-    return KbChunk.objects.filter(knowledge_base_id__in=kb_ids)
+    return KbChunk.objects.filter(knowledge_base_id__in=kb_ids).select_related("knowledge_base")

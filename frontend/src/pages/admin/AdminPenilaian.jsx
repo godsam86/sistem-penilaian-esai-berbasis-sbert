@@ -29,31 +29,30 @@ export default function AdminPenilaian() {
   useEffect(() => { load(1); setPage(1); }, [search]);
 
   const handleExport = async (format) => {
-  const params = {};
-  if (search) params.search = search;
-  if (ujianFilter) params.ujian_id = ujianFilter;
+    const params = {};
+    if (search) params.search = search;
 
-  try {
-    const response = await api.get(`/penilaian/export/${format}/`, {
-      params,
-      responseType: 'blob',
-    });
+    try {
+      const response = await api.get(`/penilaian/export/${format}/`, {
+        params,
+        responseType: 'blob',
+      });
 
-    const blob = new Blob([response.data]);
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
 
-    link.href = url;
-    link.download = `hasil_penilaian.${format}`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Export gagal:', error);
-    alert('Gagal mengexport data.');
-  }
-};
+      link.href = url;
+      link.download = `hasil_penilaian.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Export gagal:', error);
+      alert('Gagal mengexport data.');
+    }
+  };
 
   return (
     <AdminLayout title="Seluruh Hasil Penilaian">

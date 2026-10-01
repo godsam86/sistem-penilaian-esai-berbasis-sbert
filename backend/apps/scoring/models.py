@@ -26,6 +26,12 @@ class Penilaian(models.Model):
     model_version = models.CharField(max_length=100, blank=True, default="")
     scoring_version = models.CharField(max_length=20, blank=True, default="")
 
+    # Snapshot chunk Top-K yang dipakai saat semantic scoring (bagian 19, 24)
+    # -- disimpan sebagai salinan isi teksnya sendiri (bukan cuma FK ke
+    # kb_chunks), supaya tetap bisa ditampilkan di detail hasil meski chunk
+    # aslinya kemudian diedit/dihapus lewat fitur kurasi chunk.
+    top_k_chunks = models.JSONField(default=list, blank=True)
+
     # Usulan tambahan (dijelaskan di Tahap 2): error pemrosesan TIDAK BOLEH
     # otomatis jadi skor 0 (bagian 21) -- harus bisa ditandai gagal + retry.
     processing_status = models.CharField(

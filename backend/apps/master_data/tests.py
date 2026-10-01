@@ -1,3 +1,4 @@
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -174,3 +175,98 @@ class AktifkanKembaliTests(APITestCase):
         self.assertEqual(res_aktif.status_code, status.HTTP_200_OK)
         other_user.refresh_from_db()
         self.assertEqual(other_user.status, 1)
+
+
+class SiswaImportTests(APITestCase):
+    """Impor massal siswa dari Excel -- atas permintaan Anda."""
+
+    def setUp(self):
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        from apps.master_data.models import MasterJurusan, MasterKelas
+
+        self.login_url = reverse("login")
+        admin_user = User.objects.create_user(email="admin-impor@sekolah.id", password="Rahasia1", nama="Admin", role=Role.ADMIN)
+        MasterAdmin.objects.create(user=admin_user)
+        res = self.client.post(self.login_url, {"email": "admin-impor@sekolah.id", "credential": "Rahasia1"})
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.data['access']}")
+
+        self.kelas = MasterKelas.objects.create(nama_kelas="X TKJ 9", tingkat="X")
+        self.jurusan = MasterJurusan.objects.create(kode_jurusan="TKJ9", nama_jurusan="TKJ 9")
+        self.impor_url = reverse("master-siswa-impor")
+        self.template_url = reverse("master-siswa-template")
+
+    def _buat_excel(self, rows):
+        from io import BytesIO
+
+        from openpyxl import Workbook
+
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Nama", "Email", "NISN"])
+        for row in rows:
+            ws.append(row)
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return SimpleUploadedFile("siswa.xlsx", buf.read(), content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    def test_download_template(self):
+        res = self.client.get(self.template_url)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("spreadsheetml", res["Content-Type"])
+
+    def test_impor_berhasil_semua(self):
+        file = self._buat_excel([
+            ["Siswa Satu", "impor1@sekolah.id", "5001"],
+            ["Siswa Dua", "impor2@sekolah.id", "5002"],
+        ])
+        res = self.client.post(self.impor_url, {"file": file, "kelas": self.kelas.id, "jurusan": self.jurusan.id}, format="multipart")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data["berhasil"]), 2)
+        self.assertEqual(len(res.data["gagal"]), 0)
+        self.assertTrue(User.objects.filter(email="impor1@sekolah.id", role=Role.SISWA).exists())
+
+    def test_impor_email_duplikat_dilaporkan_gagal_tapi_lanjut(self):
+        User.objects.create_user(email="sudahada@sekolah.id", password=None, nama="Sudah Ada", role=Role.SISWA)
+        file = self._buat_excel([
+            ["Siswa Duplikat", "sudahada@sekolah.id", "5003"],
+            ["Siswa Valid", "valid@sekolah.id", "5004"],
+        ])
+        res = self.client.post(self.impor_url, {"file": file, "kelas": self.kelas.id, "jurusan": self.jurusan.id}, format="multipart")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data["berhasil"]), 1)
+        self.assertEqual(len(res.data["gagal"]), 1)
+        self.assertIn("sudah dipakai", res.data["gagal"][0]["alasan"])
+
+    def test_impor_baris_setengah_kosong_dilaporkan_gagal(self):
+        file = self._buat_excel([["Hanya Nama", "", ""]])
+        res = self.client.post(self.impor_url, {"file": file, "kelas": self.kelas.id, "jurusan": self.jurusan.id}, format="multipart")
+        self.assertEqual(len(res.data["gagal"]), 1)
+
+    def test_impor_baris_kosong_penuh_dilewati_tanpa_error(self):
+        file = self._buat_excel([["", "", ""], [None, None, None], ["Siswa Valid", "valid-kosong@sekolah.id", "5100"]])
+        res = self.client.post(self.impor_url, {"file": file, "kelas": self.kelas.id, "jurusan": self.jurusan.id}, format="multipart")
+        self.assertEqual(len(res.data["berhasil"]), 1)
+        self.assertEqual(len(res.data["gagal"]), 0)
+
+    def test_impor_nisn_berupa_angka_tidak_jadi_desimal(self):
+        from apps.master_data.models import MasterSiswa
+
+        file = self._buat_excel([["Siswa Angka", "angka@sekolah.id", 5200], ["Siswa Float", "float@sekolah.id", 5201.0]])
+        res = self.client.post(self.impor_url, {"file": file, "kelas": self.kelas.id, "jurusan": self.jurusan.id}, format="multipart")
+        self.assertEqual(len(res.data["berhasil"]), 2)
+        self.assertTrue(MasterSiswa.objects.filter(nisn="5200").exists())
+        self.assertTrue(MasterSiswa.objects.filter(nisn="5201").exists())
+
+    def test_template_tanpa_login_ditolak(self):
+        self.client.credentials()
+        res = self.client.get(self.template_url)
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_impor_file_bukan_excel_ditolak(self):
+        file = SimpleUploadedFile("siswa.txt", b"bukan excel", content_type="text/plain")
+        res = self.client.post(self.impor_url, {"file": file, "kelas": self.kelas.id, "jurusan": self.jurusan.id}, format="multipart")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)

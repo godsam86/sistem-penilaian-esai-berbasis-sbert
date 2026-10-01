@@ -36,36 +36,44 @@ export default function GuruHasil() {
   useEffect(() => { load(1); setPage(1); }, [search, ujianFilter]);
 
   const handleExport = async (format) => {
-  const params = {};
-  if (search) params.search = search;
-  if (ujianFilter) params.ujian_id = ujianFilter;
-
   try {
-    const response = await api.get(`/penilaian/export/${format}/`, {
-      params,
-      responseType: 'blob',
+    const params = new URLSearchParams();
+
+    if (search) params.set('search', search);
+    if (ujianFilter) params.set('ujian_id', ujianFilter);
+
+    const response = await api.get(
+      `/penilaian/export/${format}/?${params.toString()}`,
+      {
+        responseType: 'blob',
+      }
+    );
+
+    const blob = new Blob([response.data], {
+      type:
+        format === 'pdf'
+          ? 'application/pdf'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    const blob = new Blob([response.data]);
     const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
 
+    const link = document.createElement('a');
     link.href = url;
-    link.download = `hasil_penilaian.${format}`;
+    link.download =
+      format === 'pdf'
+        ? 'hasil-penilaian.pdf'
+        : 'hasil-penilaian.xlsx';
+
     document.body.appendChild(link);
     link.click();
     link.remove();
+
     window.URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('Export gagal:', error);
-    alert('Gagal mengexport data.');
+    console.error('Gagal mengekspor hasil penilaian:', error);
   }
 };
-
-  const handleRetry = async (id) => {
-    await api.post(`/penilaian/hasil/${id}/retry/`);
-    load(page);
-  };
 
   return (
     <GuruLayout title="Hasil Penilaian">
@@ -131,22 +139,47 @@ export default function GuruHasil() {
       </div>
 
       {detail && (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setDetail(null)}>
-          <div className="card w-full max-w-2xl p-6 my-8" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={() => setDetail(null)}>
+          <div className="card w-full max-w-2xl max-h-[85vh] flex flex-col p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 shrink-0">
               <h2 className="text-lg font-bold text-surface-900">Detail Penilaian</h2>
               <button onClick={() => setDetail(null)}><X className="w-5 h-5 text-surface-400" /></button>
             </div>
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-sm overflow-y-auto pr-1">
               <p><span className="font-semibold">Siswa:</span> {detail.nama_siswa} ({detail.nisn}) - {detail.kelas}/{detail.jurusan}</p>
               <p><span className="font-semibold">Soal:</span> {detail.pertanyaan}</p>
-              <p><span className="font-semibold">Jawaban:</span> {detail.jawaban_teks || <em>kosong</em>}</p>
+              <div>
+                <p className="font-semibold mb-1">Jawaban:</p>
+                {detail.jawaban_teks ? (
+                  <div className="max-h-40 overflow-y-auto bg-surface-50 border border-surface-100 rounded-lg p-3 whitespace-pre-wrap">
+                    {detail.jawaban_teks}
+                  </div>
+                ) : (
+                  <p className="text-surface-400 italic">kosong</p>
+                )}
+              </div>
               <p><span className="font-semibold">Knowledge Base:</span> {detail.knowledge_base_terkait?.join(', ')}</p>
               <div className="grid grid-cols-3 gap-3 py-2">
                 <div className="card p-3 text-center"><p className="text-xs text-surface-500">Semantic Raw</p><p className="font-bold">{detail.semantic_raw?.toFixed(4)}</p></div>
                 <div className="card p-3 text-center"><p className="text-xs text-surface-500">Semantic Score</p><p className="font-bold">{detail.semantic_score?.toFixed(2)}</p></div>
                 <div className="card p-3 text-center"><p className="text-xs text-surface-500">Concept Score</p><p className="font-bold">{detail.concept_score?.toFixed(2)}</p></div>
               </div>
+              {detail.top_k_chunks?.length > 0 && (
+                <div>
+                  <p className="font-semibold mb-1">Chunk Relevan (Top-{detail.top_k_chunks.length})</p>
+                  <div className="space-y-2">
+                    {detail.top_k_chunks.map((c, i) => (
+                      <div key={c.chunk_id ?? i} className="bg-surface-50 border border-surface-100 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-primary-700">{c.knowledge_base_judul}</span>
+                          <span className="badge bg-primary-100 text-primary-700">{(c.similarity * 100).toFixed(1)}%</span>
+                        </div>
+                        <p className="text-xs text-surface-600 max-h-24 overflow-y-auto whitespace-pre-wrap">{c.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div>
                 <p className="font-semibold mb-1">Concept Unit</p>
                 <ul className="space-y-1">

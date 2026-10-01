@@ -142,3 +142,16 @@ class SiswaAccountSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class SiswaImportSerializer(serializers.Serializer):
+    """Impor massal siswa dari file Excel -- atas permintaan Anda."""
+
+    file = serializers.FileField()
+    kelas = serializers.PrimaryKeyRelatedField(queryset=MasterKelas.objects.all())
+    jurusan = serializers.PrimaryKeyRelatedField(queryset=MasterJurusan.objects.all())
+
+    def validate_file(self, value):
+        if not value.name.lower().endswith((".xlsx", ".xlsm")):
+            raise serializers.ValidationError("File harus berformat .xlsx.")
+        return value

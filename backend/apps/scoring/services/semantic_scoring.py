@@ -31,6 +31,7 @@ def score_semantic(jawaban_teks: str, kb_chunks, params: dict) -> SemanticResult
         return SemanticResult(semantic_raw=0.0, semantic_score=0.0, top_k_chunks=[])
 
     jawaban_vec = np.array(embedding.embed_text(jawaban_teks))
+    chunk_map = {c.id: c for c in chunk_list}
     similarities = []
     for chunk in chunk_list:
         sim = _cosine_sim(jawaban_vec, np.array(chunk.embedding))
@@ -52,5 +53,16 @@ def score_semantic(jawaban_teks: str, kb_chunks, params: dict) -> SemanticResult
     return SemanticResult(
         semantic_raw=round(s, 6),
         semantic_score=round(semantic_score, 4),
-        top_k_chunks=[{"chunk_id": cid, "similarity": round(sim, 6)} for cid, sim in top_k],
+        top_k_chunks=[
+            {
+                "chunk_id": cid,
+                "similarity": round(sim, 6),
+                # Salinan isi teks & judul KB saat itu -- supaya tetap bisa
+                # ditampilkan di detail hasil walau chunk aslinya kemudian
+                # diedit/dihapus lewat fitur kurasi chunk (bagian 9 & 24).
+                "content": chunk_map[cid].content,
+                "knowledge_base_judul": chunk_map[cid].knowledge_base.judul,
+            }
+            for cid, sim in top_k
+        ],
     )

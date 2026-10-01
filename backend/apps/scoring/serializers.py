@@ -30,7 +30,7 @@ class HasilGuruSerializer(serializers.ModelSerializer):
         fields = [
             "id", "nama_siswa", "nisn", "kelas", "jurusan", "nama_ujian", "jenis_ujian",
             "pertanyaan", "jawaban_teks", "knowledge_base_terkait",
-            "semantic_raw", "semantic_score", "concept_score", "detail_cu",
+            "semantic_raw", "semantic_score", "concept_score", "detail_cu", "top_k_chunks",
             "relevance_status", "text_quality_status", "noise_penalty_applied",
             "final_score", "feedback", "processing_status", "processing_error",
         ]

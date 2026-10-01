@@ -3,7 +3,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../utils/api';
 import { SkeletonRows } from '../../components/common/Loading';
 import Pagination from '../../components/common/Pagination';
-import { Plus, X, Search } from 'lucide-react';
+import { Plus, X, Search, Upload, Download, CheckCircle2, XCircle } from 'lucide-react';
 
 export default function AdminSiswa() {
   const [list, setList] = useState([]);
@@ -19,6 +19,13 @@ export default function AdminSiswa() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState(emptyForm());
+  const [showImport, setShowImport] = useState(false);
+  const [importKelas, setImportKelas] = useState('');
+  const [importJurusan, setImportJurusan] = useState('');
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [importError, setImportError] = useState('');
 
   function emptyForm() { return { nama: '', email: '', nisn: '', kelas: '', jurusan: '' }; }
 
@@ -76,6 +83,54 @@ export default function AdminSiswa() {
     load();
   };
 
+  const openImport = () => {
+    setImportKelas(''); setImportJurusan(''); setImportFile(null);
+    setImportResult(null); setImportError(''); setShowImport(true);
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await api.get('/master/siswa/template/', { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'template-impor-siswa.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Unduh template gagal:', error);
+      alert('Gagal mengunduh template.');
+    }
+  };
+
+  const handleImportSubmit = async (e) => {
+    e.preventDefault();
+    setImporting(true);
+    setImportError('');
+    setImportResult(null);
+    try {
+      const payload = new FormData();
+      payload.append('file', importFile);
+      payload.append('kelas', importKelas);
+      payload.append('jurusan', importJurusan);
+      const { data } = await api.post('/master/siswa/impor/', payload, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setImportResult(data);
+      load();
+    } catch (err) {
+      setImportError(
+        typeof err.response?.data === 'object'
+          ? Object.values(err.response.data).flat().join(' ')
+          : 'Gagal mengimpor file.'
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <AdminLayout title="Akun Siswa">
       <div className="flex flex-wrap items-center gap-3 mb-5">
@@ -87,8 +142,81 @@ export default function AdminSiswa() {
           <option value="">Semua Kelas</option>
           {kelasOptions.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
         </select>
+        <button onClick={openImport} className="btn-secondary flex items-center gap-2"><Upload className="w-4 h-4" /> Impor Excel</button>
         <button onClick={openCreate} className="btn-primary flex items-center gap-2"><Plus className="w-4 h-4" /> Tambah Siswa</button>
       </div>
+
+      {showImport && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowImport(false)}>
+          <div className="card w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-surface-900">Impor Siswa dari Excel</h2>
+              <button onClick={() => setShowImport(false)}><X className="w-5 h-5 text-surface-400" /></button>
+            </div>
+
+            <button onClick={handleDownloadTemplate} className="btn-secondary w-full flex items-center justify-center gap-2 mb-4">
+              <Download className="w-4 h-4" /> Unduh Template Excel
+            </button>
+            <p className="text-xs text-surface-400 mb-4">
+              Format kolom: <b>Nama</b>, <b>Email</b>, <b>NISN</b> (baris pertama judul kolom, jangan diubah/dihapus).
+              Semua siswa dalam file akan dimasukkan ke SATU kelas &amp; jurusan yang Anda pilih di bawah.
+            </p>
+
+            <form onSubmit={handleImportSubmit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Kelas Tujuan</label>
+                  <select className="input" required value={importKelas} onChange={e => setImportKelas(e.target.value)}>
+                    <option value="">Pilih</option>
+                    {kelasOptions.map(k => <option key={k.id} value={k.id}>{k.nama_kelas}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Jurusan Tujuan</label>
+                  <select className="input" required value={importJurusan} onChange={e => setImportJurusan(e.target.value)}>
+                    <option value="">Pilih</option>
+                    {jurusanOptions.map(j => <option key={j.id} value={j.id}>{j.kode_jurusan}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="label">File Excel (.xlsx)</label>
+                <input type="file" accept=".xlsx" required className="input"
+                  onChange={e => setImportFile(e.target.files[0])} />
+              </div>
+
+              {importError && <p className="text-sm text-red-600">{importError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowImport(false)} className="btn-secondary">Tutup</button>
+                <button type="submit" disabled={importing} className="btn-primary">
+                  {importing ? 'Mengimpor...' : 'Impor Sekarang'}
+                </button>
+              </div>
+            </form>
+
+            {importResult && (
+              <div className="mt-5 border-t border-surface-100 pt-4 space-y-3">
+                <p className="text-sm font-semibold text-green-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-4 h-4" /> {importResult.berhasil.length} siswa berhasil ditambahkan
+                </p>
+                {importResult.gagal.length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold text-red-600 flex items-center gap-1 mb-1">
+                      <XCircle className="w-4 h-4" /> {importResult.gagal.length} baris gagal
+                    </p>
+                    <ul className="text-xs text-red-500 space-y-1 max-h-32 overflow-y-auto">
+                      {importResult.gagal.map((g, i) => (
+                        <li key={i}>Baris {g.baris}: {g.alasan}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
